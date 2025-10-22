@@ -20,6 +20,7 @@ type FileListProps = {
   onFilePress: (file: FileItem) => void;
   onToggleFileSelection: (fileId: number) => void;
   getTypeColor: (color: string) => string;
+  onMenuPress?: (file: FileItem) => void;
 };
 
 export const FileList: React.FC<FileListProps> = ({
@@ -28,6 +29,7 @@ export const FileList: React.FC<FileListProps> = ({
   onFilePress,
   onToggleFileSelection,
   getTypeColor,
+  onMenuPress,
 }) => {
   return (
     <ScrollView className="flex-1 px-6">
@@ -39,6 +41,7 @@ export const FileList: React.FC<FileListProps> = ({
           onPress={() => onFilePress(file)}
           onToggleSelection={() => onToggleFileSelection(file.id)}
           getTypeColor={getTypeColor}
+          onMenuPress={onMenuPress ? () => onMenuPress(file) : undefined}
         />
       ))}
     </ScrollView>
