@@ -22,6 +22,7 @@ import { getTypeColor, copyToClipboard } from "./utils/helpers";
 import "./global.css";
 import * as dbModule from "./utils/db";
 import { AccountsList } from "./components/AccountsList";
+import CameraScreen from "./components/CameraScreen";
 
 export default function App() {
   const [screen, setScreen] = useState<
@@ -401,7 +402,33 @@ export default function App() {
     };
 
     const handleCameraPress = () => {
-      console.log("Camera button pressed");
+      // open camera screen
+      setShowCamera(true);
+    };
+
+    const [showCamera, setShowCamera] = useState(false);
+
+    const handlePhotoTaken = (uri: string) => {
+      // Add a new note using the captured photo uri
+      const timestamp = new Date();
+      const formattedDate = formatDateTime(timestamp);
+      const referenceNumber = (defaultFiles.length + bundles.length + notes.length + 241).toString();
+
+      const newNote: FileItem = {
+        id: timestamp.getTime(),
+        name: `photo-${timestamp.getTime()}`,
+        date: formattedDate,
+        type: "Image",
+        typeColor: "red",
+        number: referenceNumber,
+        createdAt: formattedDate,
+        creator: currentUserEmail ?? "dsanchez113@ucmerced.edu",
+        url: uri,
+        content: "",
+      };
+
+      setNotes((prev) => [newNote, ...prev]);
+      setShowCamera(false);
     };
 
     return (
@@ -435,6 +462,10 @@ export default function App() {
           onMicrophonePress={handleMicrophonePress}
           onCameraPress={handleCameraPress}
         />
+
+        {showCamera ? (
+          <CameraScreen onClose={() => setShowCamera(false)} onPhotoTaken={handlePhotoTaken} />
+        ) : null}
 
         <NoteModal
           isVisible={isNoteModalVisible}
