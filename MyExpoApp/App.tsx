@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { StatusBar } from "expo-status-bar";
 import {
   Text,
@@ -20,6 +20,8 @@ import { files as defaultFiles, FileItem } from "./data/files";
 import { getTypeColor, copyToClipboard } from "./utils/helpers";
 
 import "./global.css";
+import * as dbModule from "./utils/db";
+import { AccountsList } from "./components/AccountsList";
 
 export default function App() {
   const [screen, setScreen] = useState<
@@ -28,6 +30,28 @@ export default function App() {
 
   // Track whether the user is logged in
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  // Track current logged in user's email
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
+
+  // Initialize DB and ensure the admin account exists
+  useEffect(() => {
+    (async () => {
+      try {
+        await dbModule.initDatabase();
+        const adminEmail = "dsanchez113@ucmerced.edu";
+        const adminPassword = "Admin";
+        const existing = await dbModule.getAccountByEmail(adminEmail);
+        if (!existing) {
+          await dbModule.addAccount(adminEmail, adminPassword);
+          console.log("Admin account created in local DB");
+        } else {
+          console.log("Admin account already exists");
+        }
+      } catch (err) {
+        console.error("DB init error:", err);
+      }
+    })();
+  }, []);
 
   // Landing screen similar to the provided mockup
   const LandingScreen = () => {
@@ -63,21 +87,28 @@ export default function App() {
     );
   };
 
-  // Login screen with username/password validation
+  // Login screen with email/password validation (uses SQLite DB)
   const LoginScreen = () => {
-  // Pre-fill username and password with 'Admin' as requested
-  const [username, setUsername] = useState("Admin");
-  const [password, setPassword] = useState("Admin");
+    // Pre-fill the email and password for the requested admin account
+    const [email, setEmail] = useState("dsanchez113@ucmerced.edu");
+    const [password, setPassword] = useState("Admin");
 
-    const onSubmit = () => {
-      // Validate username 'Admin' and password 'Admin' (case-sensitive)
-      if (username === "Admin" && password === "Admin") {
-        // Ensure navigation happens on web (Alert callbacks may not fire there)
-        setIsLoggedIn(true);
-        setScreen("home");
-        Alert.alert("Success", "Logged in successfully");
-      } else {
-        Alert.alert("Error", "Invalid username or password");
+    const onSubmit = async () => {
+      try {
+        // Lazy-load DB helper to avoid circular imports during startup
+        const db = await import("./utils/db");
+        const acct = await db.getAccountByEmail(email);
+        if (acct && acct.password === password) {
+          setIsLoggedIn(true);
+          setCurrentUserEmail(email);
+          setScreen("home");
+          Alert.alert("Success", "Logged in successfully");
+        } else {
+          Alert.alert("Error", "Invalid email or password");
+        }
+      } catch (err) {
+        console.error("Login error:", err);
+        Alert.alert("Error", "Login failed due to an internal error");
       }
     };
 
@@ -89,13 +120,13 @@ export default function App() {
             Log In
           </Text>
 
-          <Text className="text-gray-300 mb-2">Username</Text>
+          <Text className="text-gray-300 mb-2">Email</Text>
           <TextInput
-            value={username}
-            onChangeText={setUsername}
+            value={email}
+            onChangeText={setEmail}
             autoCapitalize="none"
             className="bg-card-bg rounded px-4 py-3 text-white mb-4"
-            placeholder="username"
+            placeholder="email@example.com"
             placeholderTextColor="#9CA3AF"
           />
 
@@ -117,6 +148,13 @@ export default function App() {
           </TouchableOpacity>
 
           <TouchableOpacity
+            onPress={() => setShowAccountsViewer(true)}
+            className="border-2 border-button-outline rounded-md py-3 items-center mb-4"
+          >
+            <Text className="text-button-outline">View Stored Accounts</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             onPress={() => setScreen("landing")}
             className="items-center"
           >
@@ -127,23 +165,59 @@ export default function App() {
     );
   };
 
+  const [showAccountsViewer, setShowAccountsViewer] = useState(false);
+
   const SignUpScreen = () => {
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+
+    const onSubmit = async () => {
+      if (!email || !password) {
+        Alert.alert("Missing fields", "Please provide both email and password.");
+        return;
+      }
+      try {
+        await dbModule.addAccount(email, password);
+        Alert.alert("Success", "Account created.");
+        setScreen("login");
+      } catch (err: any) {
+        console.error("Sign up failed", err);
+        Alert.alert("Error", err?.message ?? "Failed to create account");
+      }
+    };
+
     return (
       <SafeAreaView className="flex-1 bg-background px-6 items-center">
         <StatusBar style="light" />
-        <View className="w-full max-w-md mt-24 items-center">
-          <Text className="text-2xl text-button-outline font-extrabold mb-6">
-            Sign Up
-          </Text>
-          <Text className="text-gray-300 mb-4 text-center">
-            This is a placeholder Sign Up screen. You can implement account
-            creation here.
-          </Text>
-          <TouchableOpacity
-            onPress={() => setScreen("landing")}
-            className="border-2 border-button-outline rounded-md py-3 px-6 items-center"
-          >
-            <Text className="text-button-outline">Back</Text>
+        <View className="w-full max-w-md mt-16">
+          <Text className="text-2xl text-button-outline font-extrabold mb-6 text-center">Sign Up</Text>
+
+          <Text className="text-gray-300 mb-2">Email</Text>
+          <TextInput
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            className="bg-card-bg rounded px-4 py-3 text-white mb-4"
+            placeholder="email@example.com"
+            placeholderTextColor="#9CA3AF"
+          />
+
+          <Text className="text-gray-300 mb-2">Password</Text>
+          <TextInput
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            className="bg-card-bg rounded px-4 py-3 text-white mb-6"
+            placeholder="password"
+            placeholderTextColor="#9CA3AF"
+          />
+
+          <TouchableOpacity onPress={onSubmit} className="bg-button-outline rounded-md py-3 items-center mb-4">
+            <Text className="text-black font-semibold">Create Account</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => setScreen("landing")} className="items-center">
+            <Text className="text-gray-400">Back</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -338,6 +412,7 @@ export default function App() {
           onLinkPress={handleLinkPress}
           getTypeColor={getTypeColor}
           onSettingsPress={() => setScreen("settings")}
+          currentUserEmail={currentUserEmail}
         />
 
         <FileList
@@ -428,6 +503,16 @@ export default function App() {
             </TouchableOpacity>
           </View>
 
+          <View className="mb-4">
+            <Text className="text-gray-300 mb-2">Accounts (debug)</Text>
+            <TouchableOpacity
+              onPress={() => setShowAccountsViewer(true)}
+              className="border-2 border-button-outline rounded-md py-3 items-center"
+            >
+              <Text className="text-button-outline">View Stored Accounts</Text>
+            </TouchableOpacity>
+          </View>
+
           <TouchableOpacity onPress={() => setScreen("home")} className="mt-6 items-center">
             <Text className="text-gray-400">Back</Text>
           </TouchableOpacity>
@@ -439,7 +524,9 @@ export default function App() {
   // Render the correct screen wrapped with SafeAreaProvider for web
   return (
     <SafeAreaProvider>
-      {screen === "landing" ? (
+      {showAccountsViewer ? (
+        <AccountsList onClose={() => setShowAccountsViewer(false)} />
+      ) : screen === "landing" ? (
         <LandingScreen />
       ) : screen === "login" ? (
         <LoginScreen />

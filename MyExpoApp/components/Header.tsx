@@ -9,13 +9,14 @@ type HeaderProps = {
   onLinkPress: () => void;
   getTypeColor: (color: string) => string;
   onSettingsPress?: () => void;
+  currentUserEmail?: string | null;
 };
 
-export const Header: React.FC<HeaderProps> = ({ onLinkPress, getTypeColor, onSettingsPress }) => {
+export const Header: React.FC<HeaderProps> = ({ onLinkPress, getTypeColor, onSettingsPress, currentUserEmail }) => {
   return (
     <View className="px-6 pt-4 pb-4 mt-10">
       <View className="flex-row justify-between items-center mt-12 mb-2">
-        <Text className="text-white text-base">dsanchez113@ucmerced.edu</Text>
+        <Text className="text-white text-base">{currentUserEmail ?? 'dsanchez113@ucmerced.edu'}</Text>
         <TouchableOpacity onPress={onSettingsPress}>
           <FontAwesomeIcon icon={faGear} size={20} color="white" />
         </TouchableOpacity>
